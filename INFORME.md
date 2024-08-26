@@ -36,6 +36,14 @@ git clone https://github.com/foncheto/xv6-riscv.git
 cd xv6-riscv
 ```
 
+### 4A Creación rama del repositorio
+
+Para trabajar en la tarea 0, creé una rama llamada alfonso_pinto_t0 con el siguiente comando:
+
+```bash
+git checkout -b alfonso_pinto_t0
+```
+
 ### 5. Compilación del kernel de xv6
 
 Desde la carpeta del repositorio clonado, ejecuté los siguientes comandos para compilar el kernel de xv6 y correrlo en QEMU:
@@ -58,3 +66,10 @@ cat README
 ### 7. Conclusión
 
 Después de realizar las pruebas mencionadas, confirmé que xv6 se instaló y funciona correctamente en mi MacBook.
+Se guardan los cambios en la rama creada y se suben al repositorio remoto con los siguientes comandos:
+
+```bash
+git add .
+git commit -m "Create INFORME.md"
+git push origin alfonso_pinto_t0
+```
