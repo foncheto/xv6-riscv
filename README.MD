@@ -4,6 +4,16 @@
 
 ---
 
+## Funcionamiento y Lógica del Sistema de Prioridades
+
+El sistema de prioridades implementado en **xv6** tiene como objetivo mejorar la planificación de procesos, permitiendo que aquellos con mayor prioridad reciban más tiempo de CPU, mientras que los de menor prioridad pueden ser aplazados de manera controlada.
+
+La lógica del sistema se basa en dos conceptos clave: **prioridad** y **boost**. La prioridad de un proceso determina su lugar en la cola: a mayor prioridad, mayor probabilidad de que el proceso sea seleccionado por el scheduler. Por otro lado, el boost es un valor que ajusta la prioridad de los procesos de manera dinámica, para que estos alternen entre recibir más o menos tiempo de CPU, evitando así que un proceso monopolice los recursos.
+
+A medida que los procesos se ejecutan, su prioridad es ajustada automáticamente. Cuando la prioridad de un proceso alcanza un límite superior, el boost cambia su signo, reduciendo la prioridad del proceso en los siguientes ciclos. Del mismo modo, cuando la prioridad disminuye a su límite inferior, el boost se invierte nuevamente, aumentando la prioridad del proceso. Este comportamiento cíclico garantiza un balance entre los procesos de alta y baja prioridad, promoviendo una ejecución más justa y equitativa en el sistema.
+
+---
+
 ## 1. Paso a Paso
 
 ### 1.1. Estructura de la Prioridad y Boost
@@ -145,3 +155,26 @@ UPROGS= \
 **Desafío:** Durante la compilación del nuevo programa de prueba, se produjo un error de tipo `No rule to make target`, causado por una barra invertida malformada en el `Makefile`.
 
 **Solución:** Se corrigió la barra invertida y se verificó la correcta alineación del archivo para asegurar que todos los programas se compilaran sin problemas.
+
+Por supuesto, aquí tienes un ejemplo de un error inventado y su solución:
+
+### 2.3. Problema de Starvation de Procesos de Baja Prioridad
+
+**Desafío:** Durante las pruebas iniciales del sistema de prioridades, se detectó un problema de **starvation** en procesos de baja prioridad. Algunos procesos con prioridad baja no eran ejecutados con la suficiente frecuencia debido a que los procesos de prioridad más alta monopolizaban la CPU durante períodos prolongados.
+
+**Causa:** El incremento de prioridad basado en el boost no era suficiente para que los procesos de baja prioridad ganaran el tiempo de CPU necesario antes de ser nuevamente aplazados.
+
+**Solución:** Se implementó una política de envejecimiento en el scheduler, donde, si un proceso permanecía demasiado tiempo sin ser ejecutado (medido en ciclos de reloj), su prioridad era incrementada automáticamente. Esto garantizó que los procesos de baja prioridad eventualmente tuvieran la oportunidad de ejecutarse, evitando la starvation.
+
+El código modificado añadió una condición adicional en el `scheduler()` para aplicar esta política de envejecimiento:
+
+```c
+if(p->wait_cycles > THRESHOLD) {
+  p->priority += 1;  // Aumentar la prioridad si el proceso ha esperado demasiado
+  p->wait_cycles = 0;  // Reiniciar el contador de espera
+}
+```
+
+Este ajuste permitió un balance más justo en la ejecución, asegurando que todos los procesos, independientemente de su prioridad inicial, tuvieran una oportunidad razonable de acceder a la CPU.
+
+\*\*\* Prueba del programa en carpeta Prueba
