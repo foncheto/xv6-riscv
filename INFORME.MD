@@ -1,4 +1,3 @@
-````markdown
 # INFORME TAREA 2 Alfonso Pinto Morales
 
 ## Modificaciones Realizadas
@@ -14,7 +13,6 @@ struct proc {
     ...
 };
 ```
-````
 
 En la función `allocproc()` en `proc.c`, se inicializaron estos campos:
 
