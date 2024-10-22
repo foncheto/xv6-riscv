@@ -124,6 +124,7 @@ allocproc(void)
   return 0;
 
 found:
+  // Inicializar proceso
   p->pid = allocpid();
   p->state = USED;
 
@@ -472,6 +473,7 @@ void scheduler(void)
     int found = 0;
     for (p = proc; p < &proc[NPROC]; p++)
     {
+      // Seleccionar proceso con estado RUNNABLE
       acquire(&p->lock);
       if (p->state == RUNNABLE)
       {
@@ -479,6 +481,7 @@ void scheduler(void)
         // Lógica de prioridad y boost para el proceso
         p->priority += p->boost;
 
+        // Actualizar boost del proceso
         if (p->priority >= 9)
         {
           p->boost = -1;
@@ -493,6 +496,7 @@ void scheduler(void)
         c->proc = p;
         swtch(&c->context, &p->context);
 
+        // Proceso terminó de ejecutar
         c->proc = 0;
         found = 1;
       }
@@ -501,6 +505,7 @@ void scheduler(void)
 
     if (found == 0)
     {
+      // No hay procesos disponibles para ejecutar
       intr_on();
       asm volatile("wfi");
     }
