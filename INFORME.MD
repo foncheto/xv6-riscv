@@ -1,79 +1,128 @@
-# INFORME TAREA 1 Alfonso Pinto Morales
+Informe tarea 2  
+Modificaciones realizadas
 
-## Funcionamiento de las Llamadas al Sistema
+1. Estructura de la prioridad y boost  
+   Para implementar el sistema de prioridades, añadí dos nuevos campos a la estructura `proc` en el archivo `proc.h`:
 
-1. **`getppid()`**: Esta llamada al sistema devuelve el ID de proceso del padre (PPID) del proceso que la invoca. Es útil para que un proceso conozca quién lo ha creado, lo cual es relevante en tareas de depuración y monitoreo de procesos.
+```c
+struct proc {
+    ...
+    int priority;  // Campo de prioridad
+    int boost;     // Campo de boost
+    ...
+};
+```
 
-2. **`getancestor(int n)`**: Esta llamada al sistema devuelve el ID de proceso de un ancestro `n` del proceso que la invoca. Por ejemplo, `getancestor(0)` devuelve el propio proceso, `getancestor(1)` devuelve el proceso padre, y así sucesivamente. Si `n` es mayor que el número de ancestros disponibles, la función devuelve `-1`.
+Luego, inicialicé estos campos en la función `allocproc()` en el archivo `proc.c`:
 
-### Implementación de `getppid()`
+```c
+p->priority = 0;  // La prioridad comienza en 0
+p->boost = 1;     // El boost comienza en 1
+```
 
-1. **Definición de la Llamada al Sistema:**
+2. Modificación del scheduler  
+   El `scheduler` fue modificado para actualizar la prioridad de cada proceso en cada ciclo. Se implementó una lógica que ajusta la prioridad dependiendo del valor del boost.
 
-    - Se añadió la definición de `SYS_getppid` en el archivo `kernel/syscall.h`.
+El código modificado en la función `scheduler()` es:
 
-2. **Asignación del Número de Llamada al Sistema:**
+```c
+void
+scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
 
-    - Se añadió la entrada `[SYS_getppid] sys_getppid` en el archivo `kernel/syscall.c` para asociar el número de llamada al sistema con su función correspondiente.
+  c->proc = 0;
+  for(;;){
+    intr_on();  // Habilitar interrupciones para evitar deadlocks
 
-3. **Implementación de la Función del Núcleo:**
+    int found = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
 
-    - La función `sys_getppid()` fue implementada en `kernel/sysproc.c` para obtener y devolver el ID del proceso padre del proceso actual (`myproc()->parent->pid`).
+        // Lógica de prioridad y boost
+        p->priority += p->boost;
 
-4. **Modificación del Archivo `user.h`:**
+        if(p->priority >= 9) {
+          p->boost = -1;
+        } else if(p->priority <= 0) {
+          p->boost = 1;
+        }
 
-    - Se añadió la declaración `int getppid(void);` en el archivo `user/user.h` para que los programas de usuario puedan invocar la nueva llamada al sistema.
+        // Cambiar al proceso seleccionado
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
 
-5. **Modificación del Archivo `usys.S`:**
+        c->proc = 0;
+        found = 1;
+      }
+      release(&p->lock);
+    }
 
-    - Se añadió la entrada `SYSCALL(getppid)` en el archivo `user/usys.S`.
+    if(found == 0) {
+      // No hay nada para ejecutar; esperar una interrupción.
+      intr_on();
+      asm volatile("wfi");
+    }
+  }
+}
+```
 
-6. **Creación del Programa de Prueba `yosoytupadre.c`:**
+Este código modifica la prioridad de cada proceso según su boost. Si la prioridad alcanza 9, el boost se reduce a -1, y si baja a 0, el boost vuelve a 1.
 
-    - Se añadió un programa en `user/yosoytupadre.c` para probar la nueva llamada al sistema. Este programa simplemente invoca `getppid()` y muestra el resultado.
+3. Programa de prueba  
+   Desarrollé un programa de prueba (`test_priority.c`) que crea 20 procesos, los cuales imprimen su PID cuando son ejecutados. Para evitar que la salida se mezcle, utilicé la función `sleep()` en los procesos, con un tiempo de espera proporcional al índice de cada proceso:
 
-7. **Modificación del Makefile:**
-    - Se actualizó el `Makefile` para compilar `yosoytupadre` y asegurarse de que se incluya en la construcción de xv6.
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
 
-### Implementación de `getancestor(int n)`
+int
+main(void)
+{
+  int i;
 
-1. **Definición de la Llamada al Sistema:**
+  // Crear 20 procesos
+  for(i = 0; i < 20; i++) {
+    int pid = fork();
+    if(pid == 0) {
+      // Detenerse unos segundos antes de imprimir
+      sleep(i * 10);
 
-    - Se añadió la definición de `SYS_getancestor` en el archivo `kernel/syscall.h`.
+      // Código ejecutado por los procesos hijos
+      printf("Ejecutando proceso con PID: %d\n", getpid());
 
-2. **Asignación del Número de Llamada al Sistema:**
+      exit(0);
+    }
+  }
 
-    - Se añadió la entrada `[SYS_getancestor] sys_getancestor` en el archivo `kernel/syscall.c` para asociar el número de llamada al sistema con su función correspondiente.
+  // Esperar a que todos los procesos hijos terminen
+  for(i = 0; i < 20; i++) {
+    wait(0);
+  }
 
-3. **Implementación de la Función del Núcleo:**
+  exit(0);
+}
+```
 
-    - La función `sys_getancestor()` fue implementada en `kernel/sysproc.c` para recorrer la jerarquía de procesos ascendentes hasta encontrar el ancestro `n`-ésimo. Si no existe tal ancestro, la función retorna `-1`.
+4. Modificación del Makefile  
+   Agregué el nuevo programa de prueba `test_priority.c` al Makefile para asegurar que se compile correctamente. El cambio fue agregar la siguiente línea:
 
-4. **Modificación del Archivo `user.h`:**
+```makefile
+_# Incluir test_priority.c en el Makefile_
+UPROGS= \
+    ...
+    test_priority \
+    ...
+```
 
-    - Se añadió la declaración `int getancestor(int n);` en el archivo `user/user.h` para que los programas de usuario puedan invocar la nueva llamada al sistema.
+Dificultades encontradas y soluciones
 
-5. **Modificación del Archivo `usys.S`:**
+-   **Problemas con la salida desordenada**: Los mensajes impresos por los procesos se mezclaban en la consola.  
+    **Solución**: Usé `sleep()` para que los procesos imprimieran en momentos diferentes.
 
-    - Se añadió la entrada `SYSCALL(getancestor)` en el archivo `user/usys.S`.
-
-6. **Modificación del Programa de Prueba `yosoytupadre.c`:**
-
-    - Se modificó el programa en `user/yosoytupadre.c` para probar la llamada `getancestor()`. Este programa invoca `getancestor(n)` y muestra el resultado para diferentes valores de `n`.
-
-7. **Modificación del Makefile:**
-    - Se actualizó el `Makefile` para compilar la nueva versión de `yosoytupadre` con soporte para ambas llamadas al sistema (en UPROGS).
-
-## Desafíos Encontrados, Cómo Se Resolvieron y Aprendizajes
-
-1. **Errores de Tipos en las Funciones:**
-
-    - Inicialmente se encontraron errores al declarar las funciones con tipos incorrectos en `syscall.c`. Se resolvió cambiando las funciones para que retornaran el tipo `uint64` en lugar de `int`.
-
-2. **Problemas con la Declaración y Definición de las Funciones:**
-
-    - Hubo errores relacionados con la no declaración de funciones en `syscall.c` y `user.h`. Se resolvieron asegurando que cada nueva llamada al sistema tuviera tanto una declaración en `user/user.h` como una definición en `kernel/sysproc.c`.
-
-3. **Actualización del Makefile:**
-
-    - Se resolvieron errores al agregar nuevos programas de usuario, asegurando que el `Makefile` estuviera correctamente configurado para incluir los nuevos archivos de prueba.
+-   **Error de compilación (No rule to make target)**: Un error al agregar el nuevo programa de prueba al Makefile fue causado por una barra invertida mal colocada.  
+    **Solución**: Corregí la barra y alineé correctamente las líneas en el Makefile, resolviendo el problema.

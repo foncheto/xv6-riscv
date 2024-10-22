@@ -467,17 +467,18 @@ void scheduler(void)
   c->proc = 0;
   for (;;)
   {
-    intr_on(); // Habilitar interrupciones
+    intr_on(); // Habilitar interrupciones para evitar deadlocks
 
+    int found = 0;
     for (p = proc; p < &proc[NPROC]; p++)
     {
       acquire(&p->lock);
       if (p->state == RUNNABLE)
       {
-        // Aumentar prioridad con boost
+
+        // Lógica de prioridad y boost
         p->priority += p->boost;
 
-        // Cambiar boost si la prioridad alcanza los límites
         if (p->priority >= 9)
         {
           p->boost = -1;
@@ -487,23 +488,25 @@ void scheduler(void)
           p->boost = 1;
         }
 
-        // Ejecutar el proceso
+        // Cambiar al proceso seleccionado
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
 
-        // El proceso ha terminado por ahora.
         c->proc = 0;
+        found = 1;
       }
       release(&p->lock);
     }
 
-    // Si no hay procesos ejecutables, detener la CPU
-    intr_on();
-    asm volatile("wfi");
+    if (found == 0)
+    {
+      // No hay nada para ejecutar; esperar una interrupción.
+      intr_on();
+      asm volatile("wfi");
+    }
   }
 }
-
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this
