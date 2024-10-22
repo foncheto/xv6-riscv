@@ -127,9 +127,9 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
-  // Inicializar prioridad y boost
-  p->priority = 0; // Prioridad inicial
-  p->boost = 1;    // Boost inicial
+  // Inicializar prioridad y boost del proceso
+  p->priority = 0; // Prioridad inicial (0-9)
+  p->boost = 1;    // Boost inicial (incremento de prioridad)
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0)
@@ -476,7 +476,7 @@ void scheduler(void)
       if (p->state == RUNNABLE)
       {
 
-        // Lógica de prioridad y boost
+        // Lógica de prioridad y boost para el proceso
         p->priority += p->boost;
 
         if (p->priority >= 9)
@@ -488,7 +488,7 @@ void scheduler(void)
           p->boost = 1;
         }
 
-        // Cambiar al proceso seleccionado
+        // Cambiar al proceso seleccionado y ejecutarlo
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -501,7 +501,6 @@ void scheduler(void)
 
     if (found == 0)
     {
-      // No hay nada para ejecutar; esperar una interrupción.
       intr_on();
       asm volatile("wfi");
     }

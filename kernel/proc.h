@@ -107,8 +107,8 @@ struct proc
   int xstate;           // Exit status to be returned to parent's wait
   int pid;              // Process ID
 
-  int priority; // Campo de prioridad
-  int boost;    // Campo de boost
+  int priority; // Campo de prioridad para el proceso
+  int boost;    // Campo de boost para el proceso
 
   // wait_lock must be held when using this:
   struct proc *parent; // Parent process
