@@ -1,40 +1,30 @@
 ````markdown
 # INFORME TAREA 2 Alfonso Pinto Morales
 
-## Objetivo
-
-El objetivo de esta tarea es modificar el programador de procesos en **xv6** para implementar un sistema de prioridades que regule el orden de ejecución de los procesos, utilizando un campo de prioridad y un campo de boost para ajustar dinámicamente la prioridad de cada proceso.
-
 ## Modificaciones Realizadas
 
-### Incorporar Prioridad
-
-1. **Agregar un campo de prioridad**  
-   Se añadió un campo `priority` a la estructura de proceso (`proc`) en `proc.h` para manejar la prioridad de cada proceso.
-
-2. **Inicializar prioridad en 0**  
-   En la función `allocproc()` en `proc.c`, la prioridad de los nuevos procesos se inicializa en 0, indicando que el número más bajo representa una mayor prioridad.
+1. **Estructura de la prioridad y boost**  
+   Para implementar el sistema de prioridades, se añadieron dos nuevos campos a la estructura `proc` en el archivo `proc.h`:
 
 ```c
-p->priority = 0;
+struct proc {
+    ...
+    int priority;  // Campo de prioridad
+    int boost;     // Campo de boost
+    ...
+};
 ```
 ````
 
-### Incorporar Boost
-
-1. **Agregar un campo de boost**  
-   Se añadió un campo `boost` a la estructura de proceso en `proc.h` para controlar cómo cambia la prioridad con el tiempo.
-
-2. **Inicializar boost en 1**  
-   En `allocproc()`, se inicializa el campo `boost` en 1, lo que permite aumentar la prioridad de los procesos con el tiempo.
+En la función `allocproc()` en `proc.c`, se inicializaron estos campos:
 
 ```c
-p->boost = 1;
+p->priority = 0;  // La prioridad comienza en 0
+p->boost = 1;     // El boost comienza en 1
 ```
 
-### Modificación del Scheduler
-
-El `scheduler()` fue modificado para actualizar la prioridad de cada proceso en cada iteración del ciclo. Si la prioridad de un proceso llega a 9, el boost se invierte y comienza a disminuir la prioridad. Si baja a 0, el boost vuelve a ser positivo, aumentando la prioridad.
+2. **Modificación del scheduler**  
+   El `scheduler` fue modificado para actualizar la prioridad de cada proceso en cada ciclo. La prioridad cambia según el valor del boost. Aquí está el código modificado en la función `scheduler()`:
 
 ```c
 void
@@ -81,9 +71,10 @@ scheduler(void)
 }
 ```
 
-### Programa de Prueba
+Esta lógica ajusta la prioridad de los procesos: cuando la prioridad alcanza 9, el boost se reduce a -1, y cuando baja a 0, el boost vuelve a 1.
 
-Se creó el programa de prueba **`test_priority.c`** que genera 20 procesos. Cada proceso imprime su PID, con un `sleep()` proporcional al índice del proceso para evitar que la salida de los mensajes se mezcle.
+3. **Programa de Prueba**  
+   Se creó un programa de prueba (`test_priority.c`) que genera 20 procesos. Cada proceso imprime su PID, con un `sleep()` proporcional al índice del proceso para evitar que los mensajes se mezclen en la consola:
 
 ```c
 #include "kernel/types.h"
@@ -118,9 +109,8 @@ main(void)
 }
 ```
 
-### Modificación del Makefile
-
-Para asegurar que el nuevo programa de prueba se compile correctamente, se añadió **`test_priority`** en el `Makefile` dentro del bloque `UPROGS`:
+4. **Modificación del Makefile**  
+   Se actualizó el `Makefile` para compilar el programa de prueba `test_priority.c`. Para ello, se añadió la siguiente línea en el bloque de `UPROGS`:
 
 ```makefile
 UPROGS= \
@@ -131,38 +121,13 @@ UPROGS= \
 
 ## Desafíos Encontrados y Soluciones
 
-1. **Salida desordenada de procesos**:  
-   Los mensajes impresos por los procesos se mezclaban en la consola.
+1. **Problemas de salida desordenada**: Los mensajes impresos por los procesos se mezclaban en la consola, lo que dificultaba saber qué proceso estaba imprimiendo en cada momento.
 
-    - **Solución**: Usé la función `sleep()` para que los procesos imprimieran en diferentes momentos, evitando que los mensajes se mezclen.
+    - **Solución**: Se utilizó la función `sleep()` en los procesos hijos para que imprimieran en diferentes intervalos de tiempo.
 
-2. **Error de compilación ("No rule to make target")**:  
-   Al agregar el programa de prueba al `Makefile`, se produjo un error debido a una barra invertida mal colocada.
+2. **Error de compilación (`No rule to make target`)**: Hubo un error debido a una barra invertida malformada en el `Makefile` al intentar compilar el nuevo programa de prueba.
 
-    - **Solución**: Se corrigió la barra invertida y se verificó la correcta alineación de las líneas en el `Makefile`.
-
-## Consejos
-
--   Revisar el código del programador de procesos existente para entender cómo se gestionan los procesos.
--   Documentar adecuadamente todas las modificaciones realizadas para mantener el código claro y comprensible.
--   Probar los cambios con el programa de prueba para asegurar que no afecten negativamente el funcionamiento general del sistema.
-
-## Instrucciones de Entrega
-
-1. Crear una nueva rama en tu fork de xv6 para esta tarea.
-2. Realizar los cambios y commits en esta nueva rama.
-3. Subir la rama a tu repositorio en GitHub.
-4. Proporcionar en el buzón de WebC el enlace a tu rama en GitHub:
-
-    ```plaintext
-    https://github.com/tu_usuario/xv6-riscv/tree/nombre_apellido_t2
-    ```
-
-## Detalle de la Entrega
-
--   **Código fuente modificado**: Incluir los cambios en el sistema de prioridades y el scheduler.
--   **Programa de prueba**: `test_priority.c`.
--   **Informe README**: Incluir el funcionamiento y lógica del sistema de prioridades, las modificaciones realizadas, dificultades encontradas, y soluciones implementadas.
+    - **Solución**: Se corrigió la barra invertida y se verificó la correcta alineación de las líneas en el `Makefile`, lo que resolvió el problema.
 
 ```
 
