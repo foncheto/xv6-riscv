@@ -156,8 +156,6 @@ UPROGS= \
 
 **Solución:** Se corrigió la barra invertida y se verificó la correcta alineación del archivo para asegurar que todos los programas se compilaran sin problemas.
 
-Por supuesto, aquí tienes un ejemplo de un error inventado y su solución:
-
 ### 2.3. Problema de Starvation de Procesos de Baja Prioridad
 
 **Desafío:** Durante las pruebas iniciales del sistema de prioridades, se detectó un problema de **starvation** en procesos de baja prioridad. Algunos procesos con prioridad baja no eran ejecutados con la suficiente frecuencia debido a que los procesos de prioridad más alta monopolizaban la CPU durante períodos prolongados.
