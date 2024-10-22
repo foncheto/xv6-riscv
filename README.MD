@@ -4,15 +4,9 @@
 
 ---
 
-## 1. Introducción
+## 1. Paso a Paso
 
-Este informe detalla las modificaciones realizadas para implementar un sistema de prioridades y boost en el kernel de **xv6**, junto con un programa de prueba diseñado para evaluar su comportamiento. Además, se describen los desafíos encontrados durante el proceso de implementación y las soluciones aplicadas.
-
----
-
-## 2. Modificaciones Realizadas
-
-### 2.1. Estructura de la Prioridad y Boost
+### 1.1. Estructura de la Prioridad y Boost
 
 Para gestionar la ejecución de procesos según su prioridad, se añadieron dos nuevos campos en la estructura `proc` dentro del archivo `proc.h`:
 
@@ -38,7 +32,7 @@ Este sistema asigna a cada proceso un nivel de prioridad ajustable, que se incre
 
 ---
 
-### 2.2. Modificación del `Scheduler`
+### 1.2. Modificación del `Scheduler`
 
 Se implementaron cambios en la función `scheduler()` para que las prioridades de los procesos se actualicen dinámicamente en cada ciclo de ejecución. A continuación, se muestra la lógica de este ajuste:
 
@@ -90,7 +84,7 @@ Esta lógica permite que los procesos más "favorecidos" tengan su prioridad aju
 
 ---
 
-### 2.3. Programa de Prueba
+### 1.3. Programa de Prueba
 
 Se creó un programa llamado `test_priority.c` que genera 20 procesos hijos. Cada uno imprime su PID tras un breve `sleep()` calculado en función de su índice para evitar que los mensajes se mezclen:
 
@@ -125,7 +119,7 @@ main(void)
 
 ---
 
-### 2.4. Modificación del Makefile
+### 1.4. Modificación del Makefile
 
 Para integrar el programa de prueba `test_priority.c`, se añadió la siguiente línea al bloque `UPROGS` del `Makefile`:
 
@@ -138,17 +132,15 @@ UPROGS= \
 
 ---
 
-## 3. Desafíos Encontrados y Soluciones
+## 2. Desafíos Encontrados y Soluciones
 
-### 3.1. Problema de Salida Desordenada
+### 2.1. Problema de Salida Desordenada
 
 **Desafío:** Los mensajes impresos por los procesos se mezclaban en la consola, lo que hacía difícil identificar qué proceso estaba imprimiendo.
 
 **Solución:** Se implementó un `sleep()` en los procesos hijos para distribuir la ejecución a lo largo del tiempo, evitando conflictos de salida en la consola.
 
----
-
-### 3.2. Error de Compilación en el Makefile
+### 2.2. Error de Compilación en el Makefile
 
 **Desafío:** Durante la compilación del nuevo programa de prueba, se produjo un error de tipo `No rule to make target`, causado por una barra invertida malformada en el `Makefile`.
 
