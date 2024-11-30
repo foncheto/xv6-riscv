@@ -1,114 +1,150 @@
-# INFORME TAREA 3: Protección de Memoria en xv6
+# INFORME 4 Alfonso Pinto
 
-### Alfonso Pinto Morales
+## Funcionamiento y lógica
 
----
+Este proyecto implementa la funcionalidad de `chmod`, que permite modificar los permisos de un archivo dentro del sistema de archivos. Para validar su correcto funcionamiento, desarrollé el programa `chmod_test.c`, que evalúa escenarios comunes relacionados con la gestión de permisos.
 
-## Funcionamiento de la Protección de Memoria
+1. **Comando de usuario (`chmod`)**:
 
-### Llamadas al Sistema Implementadas
+    - Permite al usuario ejecutar `chmod <mode> <file>` para cambiar los permisos de un archivo.
+    - Los permisos se almacenan como un valor entero en los metadatos del archivo (en la estructura `dinode`).
 
-1. **`mprotect(void *addr, int len)`**:  
-   Esta llamada al sistema permite proteger un rango de páginas de memoria como solo lectura. La función recibe una dirección inicial (`addr`) y un número de páginas (`len`) a proteger. Modifica los bits de permisos en las entradas de la tabla de páginas (PTE) de cada página afectada, deshabilitando el bit de escritura (`PTE_W`) para marcar la memoria como solo lectura.
+2. **Validación en `chmod_test.c`**:
 
-2. **`munprotect(void *addr, int len)`**:  
-   Esta llamada revierte la protección establecida por `mprotect`, permitiendo nuevamente la escritura en las páginas afectadas. Al igual que `mprotect`, utiliza `addr` y `len` para determinar el rango de páginas, y restablece el bit de escritura (`PTE_W`) en las PTEs para habilitar la escritura.
+    - Este programa prueba los cambios de permisos y su efecto en diferentes operaciones, incluyendo:
+        - Creación de un archivo con permisos iniciales.
+        - Restricciones al intentar escribir en un archivo con permisos de solo lectura.
+        - Restauración de los permisos para confirmar que se aplican correctamente.
+    - Las pruebas se realizan utilizando llamadas al sistema como `chmod` y `open`.
 
-Ambas funciones modifican directamente los permisos de la tabla de páginas, permitiendo a xv6 controlar el acceso a memoria y generando fallos de protección si el proceso intenta escribir en una página protegida.
+3. **Lógica del kernel**:
 
----
-
-## Implementación Detallada
-
-### 1. Definición de las Llamadas al Sistema
-
--   **Asignación de números de syscall**: Se añadieron las definiciones de `SYS_mprotect` y `SYS_munprotect` en `kernel/syscall.h` y se les asignaron los números 22 y 23 respectivamente.
--   Esto permite que xv6 reconozca estas llamadas como operaciones válidas y asigna una referencia única a cada una.
-
-### 2. Implementación de las Funciones del Núcleo
-
--   **Funciones de núcleo (`sys_mprotect` y `sys_munprotect`)**:  
-    Se implementaron en `kernel/sysproc.c` y actúan como intermediarios entre la llamada del usuario y la lógica de protección de memoria. Estas funciones validan los argumentos y llaman a las funciones `mprotect` y `munprotect` del núcleo para realizar las modificaciones en la tabla de páginas.
--   **Función `validate_addr_len`**:  
-    Esta función auxiliar verifica que la dirección (`addr`) esté alineada en límites de página y que `len` sea positivo, asegurando que el rango especificado es válido para el proceso.
-
-### 3. Modificaciones en Archivos del Sistema
-
--   **Inclusión en `user/user.h`**:  
-    Se añadieron las declaraciones de las nuevas llamadas al sistema para que los programas de usuario puedan acceder a `mprotect` y `munprotect`.
--   **Modificación de `kernel/syscall.c`**:  
-    Se incluyeron las referencias a `sys_mprotect` y `sys_munprotect` en la tabla de manejadores de syscalls, permitiendo que xv6 llame a las funciones correspondientes cuando se ejecuten desde un programa de usuario.
--   **Actualización de `usys.pl`**:  
-    Este script se modificó para que genere el código de ensamblador necesario para las nuevas syscalls, facilitando el acceso desde el espacio de usuario.
--   **Makefile**:  
-    Se añadió el programa de prueba (`memtest`) al Makefile para que se compile automáticamente junto con el sistema.
-
-### 4. Programa de Prueba (`memtest`)
-
--   Se implementó el programa `memtest.c` para verificar que la protección de memoria funciona como se espera.
--   El programa reserva memoria, la marca como solo lectura y verifica que los intentos de escritura en la memoria protegida fallan. Después, usa `munprotect` para restaurar los permisos de escritura y prueba que la escritura es nuevamente permitida.
+    - La llamada al sistema `sys_chmod` valida los argumentos proporcionados, bloquea el inode correspondiente, actualiza los permisos y sincroniza los cambios con el disco.
 
 ---
 
-## Lógica de la Protección de Memoria
+## Cambios realizados
 
-La protección de memoria se implementa manipulando directamente los bits de permisos en las PTEs de la tabla de páginas:
+### 1. **Estructura del sistema de archivos**
 
-### 1. Validación de Argumentos
+-   **`struct dinode`**: Se añadió un campo `perm` (int) para almacenar los permisos de cada archivo.
+-   **Alineación del tamaño**: Para evitar errores de alineación en disco, se incluyó un campo de relleno (`padding`) que asegura que el tamaño del `dinode` sea divisible por el tamaño del bloque (`BSIZE`).
 
--   **Alineación**: Se verifica que la dirección `addr` esté alineada en un límite de página, ya que la protección opera a nivel de páginas.
--   **Rango**: Se asegura que `len` sea positivo y que el rango de direcciones pertenece al proceso actual.
--   **Acceso Seguro**: Al validar estos elementos, prevenimos accesos inseguros y limitamos la protección solo a las áreas de memoria del proceso que la solicita.
+### 2. **Implementación de `sys_chmod`**
 
-### 2. Modificación de Permisos
+-   Se realizaron las siguientes modificaciones en `kernel/sysfile.c`:
+    -   Validación de los argumentos de entrada (`path` y `mode`).
+    -   Bloqueo del inode del archivo con `ilock` antes de modificar los permisos.
+    -   Validación para impedir cambios en archivos marcados como inmutables.
+    -   Sincronización de los cambios con `log_write` y liberación del inode.
 
--   **Protección (mprotect)**:  
-    Para cada PTE de la página, se desactiva el bit `PTE_W`, eliminando los permisos de escritura y marcando la página como solo lectura. Esto asegura que cualquier intento de escribir en esta página genere un fallo de protección.
--   **Desprotección (munprotect)**:  
-    Se restaura el bit `PTE_W` en cada PTE afectada, permitiendo nuevamente la escritura.
--   **sfence_vma()**:  
-    Tras modificar los permisos, se utiliza `sfence_vma()` para asegurar que los cambios en la tabla de páginas tengan efecto inmediato al limpiar las entradas en la TLB.
+### 3. **Validación de permisos en `sys_open`**
 
-### 3. Manejo de Errores
+-   Se actualizó la función `sys_open` para verificar los permisos del archivo antes de permitir su apertura:
+    -   Si el archivo tiene permisos de solo lectura (`perm == 1`), se bloquea cualquier intento de abrirlo en modo de escritura (`O_WRONLY`).
 
--   **Alineación Incorrecta**: Si `addr` no está alineada a una página, se retorna un error.
--   **Rango Inválido**: Si el rango no es positivo o no pertenece al proceso, se retorna un error.
--   **Permisos**: Verificación de permisos antes de intentar modificar las PTEs.
--   **Retorno de Errores**: Las funciones devuelven `-1` si ocurre un error en cualquiera de los pasos de validación o modificación de permisos.
+### 4. **Pruebas con `chmod_test.c`**
+
+-   El programa prueba los permisos en las siguientes etapas:
+    -   Creación de un archivo con permisos iniciales de lectura y escritura.
+    -   Escritura inicial para confirmar que los permisos funcionan.
+    -   Cambio de permisos a solo lectura (`chmod(filename, 1)`).
+    -   Verificación de que no es posible abrir el archivo en modo escritura.
+    -   Restauración de permisos de lectura y escritura (`chmod(filename, 3)`).
+    -   Escritura final para confirmar que los permisos se restauraron correctamente.
+
+Ejemplo del código actualizado:
+
+```c
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "user/user.h"
+#include "kernel/fcntl.h"
+
+int main() {
+    const char *filename = "testfile";
+
+    // Creación del archivo con permisos de lectura y escritura
+    int fd = open(filename, O_CREATE | O_RDWR);
+    if (fd < 0) {
+        printf("Error: no se pudo crear el archivo.\n");
+        exit(1);
+    }
+    printf("Archivo creado con éxito.\n");
+
+    // Escritura inicial
+    if (write(fd, "Test", 4) != 4) {
+        printf("Error: no se pudo escribir en el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("Escritura inicial completada.\n");
+    close(fd);
+
+    // Cambio de permisos a solo lectura
+    if (chmod(filename, 1) < 0) {
+        printf("Error: chmod a solo lectura falló.\n");
+        exit(1);
+    }
+    printf("Permisos cambiados a solo lectura.\n");
+
+    // Intento de abrir en modo escritura
+    fd = open(filename, O_WRONLY);
+    if (fd >= 0) {
+        printf("Error: se pudo abrir en modo escritura cuando debería estar en solo lectura.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("El archivo no puede abrirse en modo escritura.\n");
+
+    // Restaurar permisos de lectura/escritura
+    if (chmod(filename, 3) < 0) {
+        printf("Error: chmod a lectura/escritura falló.\n");
+        exit(1);
+    }
+    printf("Permisos restaurados a lectura/escritura.\n");
+
+    // Escritura final
+    fd = open(filename, O_RDWR);
+    if (fd < 0) {
+        printf("Error: no se pudo abrir el archivo en modo lectura/escritura.\n");
+        exit(1);
+    }
+    if (write(fd, " Final Test", 11) != 11) {
+        printf("Error: no se pudo escribir en el archivo.\n");
+        close(fd);
+        exit(1);
+    }
+    printf("Escritura final completada.\n");
+    close(fd);
+
+    exit(0);
+}
+```
+
+### 5. **Modificaciones en el sistema de compilación**
+
+-   Se actualizó el `Makefile` para incluir el nuevo comando `chmod` y el programa de pruebas `chmod_test.c`.
 
 ---
 
-## Desafíos Encontrados y Soluciones
+## Dificultades encontradas y soluciones implementadas
 
-1. **Manejo de Argumentos de Syscall**
+1. **Validación de permisos en `sys_open`**:
 
-    - **Problema**: Inicialmente se presentaron errores al utilizar `argaddr` y `argint` debido a una incorrecta manipulación de tipos.
-    - **Solución**: Se implementaron correctamente las funciones auxiliares para obtener argumentos de la syscall, cambiando los tipos de `void*` a `uint64` en la definición de las funciones del sistema, lo cual resolvió los errores de tipo.
+    - **Problema**: Los permisos de solo lectura no se aplicaban correctamente.
+    - **Solución**: Se agregó validación explícita en `sys_open` para bloquear intentos de apertura en modo escritura.
 
-2. **Declaración de Funciones**
+2. **Errores de compilación en `sys_chmod`**:
 
-    - **Problema**: Se encontraron errores de declaración implícita en el proceso de compilación.
-    - **Solución**: Se añadieron prototipos de las funciones en `defs.h` y se reorganizó el código para asegurar que todas las referencias fueran correctas.
+    - **Problema**: Faltaban declaraciones en los encabezados.
+    - **Solución**: Se ajustaron las declaraciones y definiciones en los archivos `syscall.h`, `fs.h` y otros.
 
-3. **Validación de Rango de Memoria**
+3. **Alineación de tamaño en `dinode`**:
 
-    - **Problema**: Fue necesario asegurar que el rango de memoria especificado estuviera correctamente alineado y dentro de los límites del proceso.
-    - **Solución**: Se implementó `validate_addr_len` para realizar estas validaciones, simplificando las funciones principales `mprotect` y `munprotect`.
+    - **Problema**: El tamaño del `dinode` dejó de ser divisible por el tamaño del bloque, causando errores de inicialización.
+    - **Solución**: Se añadió un campo de relleno (`padding`) para asegurar la alineación.
 
-4. **Referencias Indefinidas**
-
-    - **Problema**: Algunas referencias no estaban correctamente enlazadas en la compilación.
-    - **Solución**: Se revisaron y actualizaron todos los archivos del sistema afectados, incluyendo el Makefile, para asegurar la compilación sin errores.
-
----
-
-## Evidencia de Funcionamiento
-
-Se adjunta un pantallazo en la carpeta `Pruebas` con la ejecución del programa de prueba `memtest` en xv6, el cual muestra:
-
-1. La memoria se puede reservar correctamente mediante `sbrk`.
-2. La protección `mprotect` establece la memoria como solo lectura.
-3. Los intentos de escritura en la memoria protegida fallan como se espera.
-4. `munprotect` permite revertir la protección y los intentos de escritura son exitosos tras la desprotección.
-
-Este programa de prueba valida que las llamadas al sistema `mprotect` y `munprotect` funcionan correctamente para proteger y desproteger regiones de memoria en xv6, cumpliendo con los objetivos de la tarea.
+4. **Depuración de permisos**:
+    - **Problema**: No estaba claro si los permisos se aplicaban correctamente.
+    - **Solución**: Se añadieron mensajes de depuración (`printf`) para rastrear los cambios en los permisos.
